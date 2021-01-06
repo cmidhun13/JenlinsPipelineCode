@@ -1,0 +1,95 @@
+pipeline {
+    agent any
+/**
+    triggers {
+        pollSCM '* * * * *'
+    }
+**/    
+	parameters {
+		choice(name: 'action', choices: 'create\nrollback', description: 'Create/rollback of the deployment')
+	}
+    tools{ 
+        gradle 'gradle'
+    }
+	
+    stages {
+		stage('Git Checkout') {
+			when {
+				expression { params.action == 'create' }
+			}
+            steps {
+                git branch: 'main', changelog: false, credentialsId: 'github', poll: false, url: 'https://github.com/cmidhun13/spring-boot-api-example.git'
+            }
+		}
+		stage('SonarQube analysis') {
+		    steps {
+		        withSonarQubeEnv('SonarQube') {
+		            sh "./gradlew sonarqube"
+		        }
+		    }
+		}
+		stage('Quality gate') {
+		    steps {
+		        waitForQualityGate abortPipeline: true
+		    }
+		}
+		stage('Build') {
+			steps {
+				sh './gradlew assemble'
+			}
+		}
+		stage('OWASP Dependency Check') {
+            steps {
+                dependencyCheck additionalArguments: '', odcInstallation: 'OWASP-Dependency-Check'
+                dependencyCheckPublisher pattern: '', unstableNewCritical: 1, unstableNewHigh: 1, unstableNewLow: 1, unstableNewMedium: 1, unstableTotalCritical: 1, unstableTotalHigh: 1, unstableTotalLow: 1, unstableTotalMedium: 1
+            }
+		}
+		stage('Test') {
+			steps {
+				sh './gradlew test'
+			}
+		}
+		stage('Build Docker image') {
+			steps {
+				sh './gradlew docker'
+			}
+		}
+		stage('Push Docker image') {
+			environment {
+				DOCKER_HUB_LOGIN = credentials('docker-hub')
+			}
+			steps {
+				sh 'docker login --username=$DOCKER_HUB_LOGIN_USR --password=$DOCKER_HUB_LOGIN_PSW'
+				sh './gradlew dockerPush -PdockerHubUsername=$DOCKER_HUB_LOGIN_USR'
+			}
+		}
+		stage (Deploy) {
+		    steps {
+		        script {
+					withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'aws-credentials', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'], kubeconfigFile(credentialsId: 'kubernetes_config', variable: 'KUBECONFIG')]) {
+						kubeconfig(credentialsId: 'mykubeconfig1', serverUrl: '') {
+						    sh "kubectl apply -f deployment.yml"
+							sleep time: 3, unit: 'MINUTES'
+						    sh "kubectl apply -f service.yml"
+						    sleep time: 1, unit: 'MINUTES'
+						    sh "kubectl get svc"
+						    sleep time: 1, unit: 'MINUTES'
+						    sh "kubectl get nodes"
+						    sleep time: 1, unit: 'MINUTES'
+						    sh "kubectl get deployments"
+						    sleep time: 1, unit: 'MINUTES'
+						    sh "kubectl get services"
+						    sleep time: 1, unit: 'MINUTES'
+						    sh "kubectl get pods -o wide"
+						    sleep time: 1, unit: 'MINUTES'
+						    sh "kubectl get nodes -o wide"
+						    sleep time: 1, unit: 'MINUTES'
+						    sh "netstat -tulnp"
+						    
+						}
+					}
+		        }
+		    }
+		}
+	}
+}
