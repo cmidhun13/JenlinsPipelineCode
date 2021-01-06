@@ -1,0 +1,19 @@
+pipeline {
+    agent any
+    stages {
+        stage('Git Checkout') {
+            steps {
+                git branch: 'main', changelog: false, credentialsId: 'github', poll: false, url: 'https://github.com/cmidhun13/spring-boot-api-example.git'
+            }
+		}
+		stage ('Create EKS Cluster') {
+		    steps {
+		        script {
+					withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'aws-credentials', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'], kubeconfigFile(credentialsId: 'kubernetes_config', variable: 'KUBECONFIG')]) {
+						sh "eksctl create cluster -f cluster.yml"
+					}
+		        }
+		    }
+		}
+	}
+}
