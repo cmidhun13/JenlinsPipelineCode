@@ -1,0 +1,14 @@
+pipeline {
+    agent any
+    stages {
+		stage ('Create EKS Cluster') {
+		    steps {
+		        script {
+					withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'aws-credentials', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'], kubeconfigFile(credentialsId: 'kubernetes_config', variable: 'KUBECONFIG')]) {
+						sh "eksctl delete cluster --region=us-east-1 --name=EKS-Demo-Cluster"
+					}
+		        }
+		    }
+		}
+	}
+}
