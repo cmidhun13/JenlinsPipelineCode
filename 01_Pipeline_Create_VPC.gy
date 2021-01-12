@@ -10,7 +10,7 @@ pipeline {
 			steps {
 				script {
 					withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'aws-credentials', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'], kubeconfigFile(credentialsId: 'kubernetes_config', variable: 'KUBECONFIG')]) {
-						sh "aws cloudformation create-stack --stack-name EKS-Cluster-VPC --template-body file://amazon-eks-vpc-private-subnets.yaml"
+						sh "aws cloudformation create-stack --stack-name --region ap-south-1 EKS-Cluster-VPC --template-body file://amazon-eks-vpc-private-subnets.yaml"
 					}
 				}
 			}
