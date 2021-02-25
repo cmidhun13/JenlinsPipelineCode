@@ -27,12 +27,12 @@ pipeline {
 		            sh "./gradlew sonarqube"
 		        }
 		    }
-		}/**
+		}
 		stage('Quality gate') {
 		    steps {
 		        waitForQualityGate abortPipeline: true
 		    }
-		}**/
+		}
 		stage('Build') {
 			steps {
 				sh './gradlew assemble'
