@@ -5,25 +5,25 @@ pipeline {
         pollSCM '* * * * *'
     }
 **/    
+	
 	parameters {
-		choice(name: 'action', choices: 'create\nrollback', description: 'Create/rollback of the deployment')
+		string(name: 'branch', defaultValue: 'master', description: 'Please enter the branch name')
+		string(name: 'git_url', defaultValue: 'https://github.com/cmidhun13/customer-events-master.git', description: 'Please enter git URL')
+		string(name: 'container_name', defaultValue: 'customer-events', description: 'Enter container name mentioned in deployment.yml file')
 	}
     tools{ 
         gradle 'gradle'
     }
-	
     stages {
 		stage('Git Checkout') {
-			when {
-				expression { params.action == 'create' }
-			}
             steps {
-                git branch: 'main', changelog: false, credentialsId: 'github', poll: false, url: 'https://github.com/cmidhun13/spring-boot-api-example.git'
+                git branch: "${params.branch}", changelog: false, credentialsId: 'github', poll: false, url: "${params.git_url}"
             }
-		}
+		}	
 		stage('SonarQube analysis') {
 		    steps {
 		        withSonarQubeEnv('SonarQube') {
+					sh "chmod +x gradlew"
 		            sh "./gradlew sonarqube"
 		        }
 		    }
@@ -64,32 +64,21 @@ pipeline {
 			}
 		}
 		stage (Deploy) {
-		    steps {
-		        script {
-					withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', accessKeyVariable: 'AWS_ACCESS_KEY_ID', credentialsId: 'aws-credentials', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'], kubeconfigFile(credentialsId: 'kubernetes_config', variable: 'KUBECONFIG')]) {
-						kubeconfig(credentialsId: 'mykubeconfig1', serverUrl: '') {
-						    sh "kubectl apply -f deployment.yml"
-							sleep time: 3, unit: 'MINUTES'
-						    sh "kubectl apply -f service.yml"
-						    sleep time: 1, unit: 'MINUTES'
-						    sh "kubectl get svc"
-						    sleep time: 1, unit: 'MINUTES'
-						    sh "kubectl get nodes"
-						    sleep time: 1, unit: 'MINUTES'
-						    sh "kubectl get deployments"
-						    sleep time: 1, unit: 'MINUTES'
-						    sh "kubectl get services"
-						    sleep time: 1, unit: 'MINUTES'
-						    sh "kubectl get pods -o wide"
-						    sleep time: 1, unit: 'MINUTES'
-						    sh "kubectl get nodes -o wide"
-						    sleep time: 1, unit: 'MINUTES'
-						    sh "netstat -tulnp"
-						    
-						}
-					}
-		        }
-		    }
+			steps {
+				script {
+					sh "sudo su root ; cd ; ./bin/kubectl apply -f /var/jenkins_home/workspace/pipeline/deployment.yml"
+					sleep time: 1, unit: 'MINUTES'
+					sh "sudo su root ; cd ; ./bin/kubectl apply -f /var/jenkins_home/workspace/pipeline/service.yml"
+					sleep time: 1, unit: 'MINUTES'
+					sh "sudo su root ; cd ; ./bin/kubectl autoscale deployment ${params.container_name} --cpu-percent=80 --min=1 --max=10 || true"
+					sh "sudo su root ; cd ; ./bin/kubectl get svc"
+					sh "sudo su root ; cd ; ./bin/kubectl get nodes"
+					sh "sudo su root ; cd ; ./bin/kubectl get deployments"
+					sh "sudo su root ; cd ; ./bin/kubectl get services"
+					sh "sudo su root ; cd ; ./bin/kubectl get pods -o wide"					
+					sh "sudo su root ; cd ; ./bin/kubectl get nodes -o wide"
+				}
+			}
 		}
 	}
 }
