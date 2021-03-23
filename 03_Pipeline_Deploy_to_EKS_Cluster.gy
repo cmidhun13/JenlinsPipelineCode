@@ -7,9 +7,10 @@ pipeline {
 **/    
 	
 	parameters {
-		string(name: 'branch', defaultValue: 'master', description: 'Please enter the branch name')
-		string(name: 'git_url', defaultValue: 'https://github.com/cmidhun13/customer-events-master.git', description: 'Please enter git URL')
-		string(name: 'container_name', defaultValue: 'customer-events', description: 'Enter container name mentioned in deployment.yml file')
+		choice(name: 'Enverionment', choices: 'development', description: 'Select enverionment')
+		choice(name: 'module', choices: 'customer-events-master', description: 'Select your module')
+		choice(name: 'branch', choices: 'master\ndevelop', description: 'Select your branch')
+		choice(name: 'container_name', choices: 'customer-events', description: 'Enter container name:')
 	}
     tools{ 
         gradle 'gradle'
@@ -17,9 +18,9 @@ pipeline {
     stages {
 		stage('Git Checkout') {
             steps {
-                git branch: "${params.branch}", changelog: false, credentialsId: 'github', poll: false, url: "${params.git_url}"
+                git branch: "${params.branch}", changelog: false, credentialsId: 'github', poll: false, url: "https://github.com/cmidhun13/${params.module}.git"
             }
-		}	
+		}
 		stage('SonarQube analysis') {
 		    steps {
 		        withSonarQubeEnv('SonarQube') {
